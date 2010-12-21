@@ -23,7 +23,7 @@ public class TradeQueue implements Iterable<Trade> {
 	private final Lock write = lock.writeLock();
 	private final Lock read = lock.readLock();
 	private final Condition condition = write.newCondition();
-	private volatile List<Object> trades;
+	private List<Object> trades;
 
 	public TradeQueue() {
 		trades = createEmptyTradeList();
@@ -42,14 +42,19 @@ public class TradeQueue implements Iterable<Trade> {
 	}
 
 	public void clear() {
-		add(NO_MORE_TRADE);
-		trades = createEmptyTradeList();
+		try {
+			write.lock();
+			stop();
+			trades = createEmptyTradeList();
+		} finally {
+			write.unlock();
+		}
 	}
 
 	private void add(Object value) {
 		try {
 			write.lock();
-			trades.add(value); // TODO: trades could be changed in the middle, causing reader to think that something was added
+			trades.add(value);
 			condition.signalAll();
 		} finally {
 			write.unlock();
@@ -57,7 +62,12 @@ public class TradeQueue implements Iterable<Trade> {
 	}
 
 	public Iterator<Trade> iterator() {
-		return new TradeIterator(trades);
+		try {
+			read.lock();
+			return new TradeIterator(trades);
+		} finally {
+			read.unlock();
+		}
 	}
 
 	class TradeIterator extends AbstractIterator<Trade> {
@@ -71,7 +81,7 @@ public class TradeQueue implements Iterable<Trade> {
 		@Override
 		protected Trade computeNext() {
 			Object value;
-			
+
 			try {
 				read.lock();
 				if (currentValueIndex >= trades.size()) {

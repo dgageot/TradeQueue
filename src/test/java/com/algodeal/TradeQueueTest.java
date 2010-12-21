@@ -64,11 +64,11 @@ public class TradeQueueTest {
 
 	@Test
 	public void hasToBeThreadSafe() throws InterruptedException {
-		final int NB = 1000000;
+		final int NB = 2000000;
 		final AtomicInteger errorCount = new AtomicInteger(0);
 
 		List<Thread> threads = Lists.newArrayList();
-		for (int t = 0; t < 10; t++) {
+		for (int t = 0; t < 20; t++) {
 			threads.add(new Thread() {
 				@Override
 				public void run() {
