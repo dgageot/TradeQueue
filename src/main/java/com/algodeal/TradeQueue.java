@@ -41,9 +41,10 @@ public class TradeQueue implements Iterable<Trade> {
 	}
 
 	private void add(Object value) {
-		synchronized (trades) {
-			trades.add(value);
-			trades.notifyAll();
+		List<Object> list = trades;
+		synchronized (list) {
+			list.add(value);
+			list.notifyAll();
 		}
 	}
 

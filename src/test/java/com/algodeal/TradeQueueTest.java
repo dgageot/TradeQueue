@@ -80,6 +80,7 @@ public class TradeQueueTest {
 								break;
 							}
 						}
+						queue.clear();
 					} catch (Throwable e) {
 						errorCount.incrementAndGet();
 					}
@@ -89,8 +90,16 @@ public class TradeQueueTest {
 		threads.add(new Thread() {
 			@Override
 			public void run() {
-				for (int i = 0; i < NB; i++) {
-					queue.receive(new Trade(i));
+				try {
+					for (int i = 0; i < NB; i++) {
+						queue.receive(new Trade(i));
+					}
+					queue.clear();
+					for (int i = 0; i < NB; i++) {
+						queue.receive(new Trade(i));
+					}
+				} catch (Throwable e) {
+					errorCount.incrementAndGet();
 				}
 			}
 		});
