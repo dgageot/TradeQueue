@@ -3,7 +3,10 @@ package com.algodeal;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import com.google.common.base.Throwables;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.Lists;
 
@@ -17,6 +20,10 @@ import com.google.common.collect.Lists;
 public class TradeQueue implements Iterable<Trade> {
 	protected static final Object NO_MORE_TRADE = new Object();
 
+	private final ReadWriteLock lock = new ReentrantReadWriteLock();
+	private final Lock write = lock.writeLock();
+	private final Lock read = lock.readLock();
+	private final Condition condition = write.newCondition();
 	private volatile List<Object> trades;
 
 	public TradeQueue() {
@@ -41,10 +48,12 @@ public class TradeQueue implements Iterable<Trade> {
 	}
 
 	private void add(Object value) {
-		List<Object> list = trades;
-		synchronized (list) {
-			list.add(value);
-			list.notifyAll();
+		try {
+			write.lock();
+			trades.add(value); // TODO: trades could be changed in the middle, causing reader to think that something was added
+			condition.signalAll();
+		} finally {
+			write.unlock();
 		}
 	}
 
@@ -52,7 +61,7 @@ public class TradeQueue implements Iterable<Trade> {
 		return new TradeIterator(trades);
 	}
 
-	static class TradeIterator extends AbstractIterator<Trade> {
+	class TradeIterator extends AbstractIterator<Trade> {
 		private final List<Object> trades;
 		private final LinkedList<Object> buffer = Lists.newLinkedList();
 		private int currentValueIndex = 0;
@@ -64,13 +73,16 @@ public class TradeQueue implements Iterable<Trade> {
 		@Override
 		protected Trade computeNext() {
 			if (buffer.isEmpty()) {
-				synchronized (trades) {
+				try {
+					read.lock();
 					if (currentValueIndex >= trades.size()) {
-						try {
-							trades.wait();
-						} catch (InterruptedException e) {
-							throw Throwables.propagate(e);
+						read.unlock();
+						write.lock();
+						if (currentValueIndex >= trades.size()) {
+							condition.awaitUninterruptibly();
 						}
+						write.unlock();
+						read.lock();
 					}
 					int size = trades.size();
 
@@ -78,6 +90,8 @@ public class TradeQueue implements Iterable<Trade> {
 					while (currentValueIndex < max) {
 						buffer.add(trades.get(currentValueIndex++));
 					}
+				} finally {
+					read.unlock();
 				}
 			}
 
