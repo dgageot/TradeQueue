@@ -1,7 +1,6 @@
 package com.algodeal;
 
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -63,7 +62,6 @@ public class TradeQueue implements Iterable<Trade> {
 
 	class TradeIterator extends AbstractIterator<Trade> {
 		private final List<Object> trades;
-		private final LinkedList<Object> buffer = Lists.newLinkedList();
 		private int currentValueIndex = 0;
 
 		TradeIterator(List<Object> trades) {
@@ -72,30 +70,25 @@ public class TradeQueue implements Iterable<Trade> {
 
 		@Override
 		protected Trade computeNext() {
-			if (buffer.isEmpty()) {
-				try {
-					read.lock();
-					if (currentValueIndex >= trades.size()) {
-						read.unlock();
-						write.lock();
-						if (currentValueIndex >= trades.size()) {
-							condition.awaitUninterruptibly();
-						}
-						write.unlock();
-						read.lock();
-					}
-					int size = trades.size();
-
-					int max = Math.min(size, currentValueIndex + 10);
-					while (currentValueIndex < max) {
-						buffer.add(trades.get(currentValueIndex++));
-					}
-				} finally {
+			Object value;
+			
+			try {
+				read.lock();
+				if (currentValueIndex >= trades.size()) {
 					read.unlock();
+					write.lock();
+					if (currentValueIndex >= trades.size()) {
+						condition.awaitUninterruptibly();
+					}
+					write.unlock();
+					read.lock();
 				}
+
+				value = trades.get(currentValueIndex++);
+			} finally {
+				read.unlock();
 			}
 
-			Object value = buffer.removeFirst();
 			return value == NO_MORE_TRADE ? endOfData() : (Trade) value;
 		}
 	}
