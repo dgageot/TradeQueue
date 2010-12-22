@@ -11,6 +11,8 @@ import com.google.common.collect.Lists;
 public class TradeQueueTest {
 	private final Trade mockTrade1 = mock(Trade.class);
 	private final Trade mockTrade2 = mock(Trade.class);
+	private final Trade mockTrade3 = mock(Trade.class);
+	private final Trade mockTrade4 = mock(Trade.class);
 
 	@Rule
 	public Timeout timeout = new Timeout(500000);
@@ -58,6 +60,19 @@ public class TradeQueueTest {
 		queue.stop();
 
 		assertThat(tradeIterator).containsOnly(mockTrade1, mockTrade2);
+	}
+
+	@Test
+	public void canClearAndStillIterateOnAllTrades() {
+		Iterator<Trade> tradeIterator = queue.iterator();
+		queue.receive(mockTrade1);
+		queue.receive(mockTrade2);
+		queue.clear();
+		queue.receive(mockTrade3);
+		queue.receive(mockTrade4);
+		queue.stop();
+
+		assertThat(tradeIterator).isEmpty();
 	}
 
 	@Test
