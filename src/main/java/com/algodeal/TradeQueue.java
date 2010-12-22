@@ -87,7 +87,7 @@ public class TradeQueue implements Iterable<Trade> {
 				if (currentValueIndex >= trades.size()) {
 					read.unlock();
 					write.lock();
-					if (currentValueIndex >= trades.size()) {
+					while (currentValueIndex >= trades.size()) {
 						condition.awaitUninterruptibly();
 					}
 					write.unlock();
