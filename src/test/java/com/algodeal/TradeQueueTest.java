@@ -4,23 +4,22 @@ import static org.fest.assertions.Assertions.*;
 import static org.mockito.Mockito.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.junit.*;
-import org.junit.rules.Timeout;
+import org.junit.Test;
 import com.google.common.collect.Lists;
 
 public class TradeQueueTest {
 	private final Trade mockTrade1 = mock(Trade.class);
 	private final Trade mockTrade2 = mock(Trade.class);
 	private final Trade mockTrade3 = mock(Trade.class);
-	private final Trade mockTrade4 = mock(Trade.class);
 
-	@Rule
-	public Timeout timeout = new Timeout(5000);
+	//final TradeQueue queue = new RWBasedTradeQueue(); // 20x10timesx2.000.000 in 14.1s 
 
-	final TradeQueue queue = new TradeQueue();
+	final TradeQueue queue = new VectorTradeQueue(); // 20x10timesx2.000.000 in 13.9s
 
-	@Test
-	public void canIterateTrades() {
+	//final TradeQueue queue = new LockBasedTradeQueue(); // 20x10timesx2.000.000 in 17.4s
+
+	@Test(timeout = 1000)
+	public void canIterateOnAllTradesReceivedUntilStop() {
 		queue.receive(mockTrade1);
 		queue.receive(mockTrade2);
 		queue.stop();
@@ -30,7 +29,7 @@ public class TradeQueueTest {
 		assertThat(tradeIterator).containsOnly(mockTrade1, mockTrade2);
 	}
 
-	@Test
+	@Test(timeout = 1000)
 	public void canIterateMultipleTimes() {
 		queue.receive(mockTrade1);
 		queue.receive(mockTrade2);
@@ -41,43 +40,35 @@ public class TradeQueueTest {
 		assertThat(queue.iterator()).containsOnly(mockTrade1, mockTrade2);
 	}
 
-	@Test
-	public void canClear() {
+	@Test(timeout = 1000)
+	public void iteratorsCreatedAfterAClearOnlyGetTradesReceivedAfterClear() {
 		queue.receive(mockTrade1);
 		queue.receive(mockTrade2);
 		queue.clear();
-		queue.stop();
 
-		assertThat(queue.iterator()).isEmpty();
-	}
-
-	@Test
-	public void canClearWhileIterating() {
-		Iterator<Trade> tradeIterator = queue.iterator();
-		queue.receive(mockTrade1);
-		queue.receive(mockTrade2);
-		queue.clear();
-		queue.stop();
-
-		assertThat(tradeIterator).containsOnly(mockTrade1, mockTrade2);
-	}
-
-	@Test
-	public void canClearAndStillIterateOnAllTrades() {
-		Iterator<Trade> tradeIterator = queue.iterator();
-		queue.receive(mockTrade1);
-		queue.receive(mockTrade2);
-		queue.clear();
 		queue.receive(mockTrade3);
-		queue.receive(mockTrade4);
 		queue.stop();
 
-		assertThat(tradeIterator).containsOnly(mockTrade1, mockTrade2, mockTrade3, mockTrade4);
+		assertThat(queue.iterator()).containsOnly(mockTrade3);
 	}
 
-	@Test
+	@Test(timeout = 1000)
+	public void iteratorsCreatedBeforeAClearGetAllTradesReceivedBeforeAndAfterClear() {
+		Iterator<Trade> tradeIterator = queue.iterator();
+		queue.receive(mockTrade1);
+		queue.receive(mockTrade2);
+		queue.clear();
+
+		queue.receive(mockTrade3);
+		queue.stop();
+
+		assertThat(tradeIterator).containsOnly(mockTrade1, mockTrade2, mockTrade3);
+	}
+
+	@Test(timeout = 20 * 1000)
 	public void hasToBeThreadSafe() throws InterruptedException {
-		final int NB = 200000;
+		//final int NB = 2000000;
+		final int NB = 200000; // Performance test
 		final AtomicInteger errorCount = new AtomicInteger(0);
 
 		List<Thread> threads = Lists.newArrayList();
@@ -93,7 +84,6 @@ public class TradeQueueTest {
 								break;
 							}
 						}
-						queue.clear();
 					} catch (Throwable e) {
 						errorCount.incrementAndGet();
 					}
@@ -104,13 +94,13 @@ public class TradeQueueTest {
 			@Override
 			public void run() {
 				try {
-					for (int i = 0; i < NB; i++) {
-						queue.receive(new Trade(i));
+					for (int times = 0; times < 10; times++) {
+						for (int i = 0; i < NB; i++) {
+							queue.receive(new Trade(i));
+						}
+						queue.clear();
 					}
-					queue.clear();
-					for (int i = 0; i < NB; i++) {
-						queue.receive(new Trade(i));
-					}
+					queue.stop();
 				} catch (Throwable e) {
 					errorCount.incrementAndGet();
 				}
