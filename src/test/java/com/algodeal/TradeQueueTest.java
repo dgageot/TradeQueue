@@ -2,22 +2,20 @@ package com.algodeal;
 
 import static org.fest.assertions.Assertions.*;
 import static org.mockito.Mockito.*;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.*;
 import org.junit.rules.Timeout;
 import com.google.common.collect.Lists;
 
 public class TradeQueueTest {
 	private final Trade mockTrade1 = mock(Trade.class);
-	private final Trade mockTrade2  = mock(Trade.class);
-	
+	private final Trade mockTrade2 = mock(Trade.class);
+
 	@Rule
 	public Timeout timeout = new Timeout(500000);
 
-	private final TradeQueue queue = new TradeQueue();
+	final TradeQueue queue = new TradeQueue();
 
 	@Test
 	public void canIterateTrades() {

@@ -1,28 +1,21 @@
 package com.algodeal;
 
-import java.util.Iterator;
-import java.util.List;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import com.google.common.collect.AbstractIterator;
-import com.google.common.collect.Lists;
+import java.util.*;
+import java.util.concurrent.locks.*;
+import com.google.common.collect.*;
 
 /**
- * Typical use is:
- * A thread will send trades into a {@link TradeQueue}
- * through {@link #receive(Trade)}
- * Lots of different threads iterate on the trades received until
- * the queue is stopped.
+ * Typical use is: A thread will send trades into a {@link TradeQueue} through
+ * {@link #receive(Trade)} Lots of different threads iterate on the trades
+ * received until the queue is stopped.
  */
 public class TradeQueue implements Iterable<Trade> {
-	protected static final Object NO_MORE_TRADE = new Object();
+	static final Object NO_MORE_TRADE = new Object();
 
-	private final ReadWriteLock lock = new ReentrantReadWriteLock();
-	private final Lock write = lock.writeLock();
-	private final Lock read = lock.readLock();
-	private final Condition condition = write.newCondition();
+	final ReadWriteLock lock = new ReentrantReadWriteLock();
+	final Lock write = lock.writeLock();
+	final Lock read = lock.readLock();
+	final Condition condition = write.newCondition();
 	private List<Object> trades;
 
 	public TradeQueue() {
@@ -61,6 +54,7 @@ public class TradeQueue implements Iterable<Trade> {
 		}
 	}
 
+	@Override
 	public Iterator<Trade> iterator() {
 		try {
 			read.lock();
@@ -71,11 +65,11 @@ public class TradeQueue implements Iterable<Trade> {
 	}
 
 	class TradeIterator extends AbstractIterator<Trade> {
-		private final List<Object> trades;
+		private final List<Object> tradeList;
 		private int currentValueIndex = 0;
 
 		TradeIterator(List<Object> trades) {
-			this.trades = trades;
+			tradeList = trades;
 		}
 
 		@Override
@@ -84,17 +78,17 @@ public class TradeQueue implements Iterable<Trade> {
 
 			try {
 				read.lock();
-				if (currentValueIndex >= trades.size()) {
+				if (currentValueIndex >= tradeList.size()) {
 					read.unlock();
 					write.lock();
-					while (currentValueIndex >= trades.size()) {
+					while (currentValueIndex >= tradeList.size()) {
 						condition.awaitUninterruptibly();
 					}
 					write.unlock();
 					read.lock();
 				}
 
-				value = trades.get(currentValueIndex++);
+				value = tradeList.get(currentValueIndex++);
 			} finally {
 				read.unlock();
 			}
