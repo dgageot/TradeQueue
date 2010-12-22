@@ -11,9 +11,11 @@ import com.google.common.collect.Lists;
 public class TradeQueueTest {
 	private final Trade mockTrade1 = mock(Trade.class);
 	private final Trade mockTrade2 = mock(Trade.class);
+	private final Trade mockTrade3 = mock(Trade.class);
+	private final Trade mockTrade4 = mock(Trade.class);
 
 	@Rule
-	public Timeout timeout = new Timeout(500000);
+	public Timeout timeout = new Timeout(5000);
 
 	final TradeQueue queue = new TradeQueue();
 
@@ -61,8 +63,21 @@ public class TradeQueueTest {
 	}
 
 	@Test
+	public void canClearAndStillIterateOnAllTrades() {
+		Iterator<Trade> tradeIterator = queue.iterator();
+		queue.receive(mockTrade1);
+		queue.receive(mockTrade2);
+		queue.clear();
+		queue.receive(mockTrade3);
+		queue.receive(mockTrade4);
+		queue.stop();
+
+		assertThat(tradeIterator).containsOnly(mockTrade1, mockTrade2, mockTrade3, mockTrade4);
+	}
+
+	@Test
 	public void hasToBeThreadSafe() throws InterruptedException {
-		final int NB = 2000000;
+		final int NB = 200000;
 		final AtomicInteger errorCount = new AtomicInteger(0);
 
 		List<Thread> threads = Lists.newArrayList();

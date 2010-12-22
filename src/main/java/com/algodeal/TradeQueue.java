@@ -37,8 +37,9 @@ public class TradeQueue implements Iterable<Trade> {
 	public void clear() {
 		try {
 			write.lock();
-			stop();
-			trades = createEmptyTradeList();
+			List<Object> newTrades = createEmptyTradeList();
+			add(newTrades);
+			trades = newTrades;
 		} finally {
 			write.unlock();
 		}
@@ -65,7 +66,7 @@ public class TradeQueue implements Iterable<Trade> {
 	}
 
 	class TradeIterator extends AbstractIterator<Trade> {
-		private final List<Object> tradeList;
+		private List<Object> tradeList;
 		private int currentValueIndex = 0;
 
 		TradeIterator(List<Object> trades) {
@@ -73,6 +74,7 @@ public class TradeQueue implements Iterable<Trade> {
 		}
 
 		@Override
+		@SuppressWarnings("unchecked")
 		protected Trade computeNext() {
 			Object value;
 
@@ -93,7 +95,17 @@ public class TradeQueue implements Iterable<Trade> {
 				read.unlock();
 			}
 
-			return value == NO_MORE_TRADE ? endOfData() : (Trade) value;
+			if (value == NO_MORE_TRADE) {
+				return endOfData();
+			}
+			if (value instanceof Trade) {
+				return (Trade) value;
+			}
+
+			tradeList = (List<Object>) value;
+			currentValueIndex = 0;
+
+			return computeNext();
 		}
 	}
 }
